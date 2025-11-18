@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Card, Button, Table, Modal, Form, Badge, Alert, InputGroup } from 'react-bootstrap'
-import { FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa'
+import { Card, Button, Table, Modal, Form, Badge, Alert } from 'react-bootstrap'
+import { FaPlus, FaEdit, FaTrash } from 'react-icons/fa'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Buscador from '../../componentes/comunes/Buscador'
+import ModalConfirmacion from '../../componentes/comunes/ModalConfirmacion'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const GestionMaterias = () => {
   const [materias, setMaterias] = useState([])
@@ -15,6 +18,7 @@ const GestionMaterias = () => {
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
   const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false)
   const [materiaAEliminar, setMateriaAEliminar] = useState(null)
+  const [cargando, setCargando] = useState(true)
 
   const [formulario, setFormulario] = useState({
     nombre: '',
@@ -33,10 +37,14 @@ const GestionMaterias = () => {
   }, [materias, busqueda])
 
   const cargarDatos = () => {
-    const materiasDB = servicio.obtenerMaterias()
-    const docentesDB = servicio.obtenerUsuariosPorRol('docente')
-    setMaterias(materiasDB)
-    setDocentes(docentesDB)
+    setCargando(true)
+    setTimeout(() => {
+      const materiasDB = servicio.obtenerMaterias()
+      const docentesDB = servicio.obtenerUsuariosPorRol('docente')
+      setMaterias(materiasDB)
+      setDocentes(docentesDB)
+      setCargando(false)
+    }, 500)
   }
 
   const filtrarMaterias = () => {
@@ -141,6 +149,14 @@ const GestionMaterias = () => {
     return docente ? docente.nombre : 'Sin asignar'
   }
 
+  const manejarBusqueda = (termino) => {
+    setBusqueda(termino)
+  }
+
+  if (cargando) {
+    return <Cargando texto="Cargando materias..." />
+  }
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -159,17 +175,11 @@ const GestionMaterias = () => {
 
       <Card className="mb-3 shadow-sm">
         <Card.Body>
-          <InputGroup>
-            <InputGroup.Text>
-              <FaSearch />
-            </InputGroup.Text>
-            <Form.Control
-              type="text"
-              placeholder="Buscar por nombre, código o nivel..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-            />
-          </InputGroup>
+          <Buscador
+            placeholder="Buscar por nombre, código o nivel..."
+            onBuscar={manejarBusqueda}
+            valorInicial={busqueda}
+          />
         </Card.Body>
       </Card>
 
@@ -329,23 +339,15 @@ const GestionMaterias = () => {
       </Modal>
 
       {/* Modal de confirmación */}
-      <Modal show={mostrarModalConfirmacion} onHide={() => setMostrarModalConfirmacion(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Confirmar Eliminación</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          ¿Está seguro que desea eliminar la materia <strong>{materiaAEliminar?.nombre}</strong>?
-          Esta acción no se puede deshacer.
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setMostrarModalConfirmacion(false)}>
-            Cancelar
-          </Button>
-          <Button variant="danger" onClick={eliminarMateria}>
-            Eliminar
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ModalConfirmacion
+        mostrar={mostrarModalConfirmacion}
+        onCerrar={() => setMostrarModalConfirmacion(false)}
+        onConfirmar={eliminarMateria}
+        titulo="Confirmar Eliminación"
+        mensaje={`¿Está seguro que desea eliminar la materia ${materiaAEliminar?.nombre}? Esta acción no se puede deshacer.`}
+        textoBotonConfirmar="Eliminar"
+        variante="danger"
+      />
     </div>
   )
 }
