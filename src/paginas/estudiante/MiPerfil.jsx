@@ -3,6 +3,7 @@ import { Card, Form, Button, Alert, Row, Col } from 'react-bootstrap'
 import { FaUser, FaSave } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const MiPerfil = () => {
   const { usuarioActual, actualizarUsuarioActual } = useAutenticacion()
@@ -15,6 +16,7 @@ const MiPerfil = () => {
   })
   const [validated, setValidated] = useState(false)
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     if (usuarioActual) {
@@ -25,6 +27,7 @@ const MiPerfil = () => {
         direccion: usuarioActual.direccion || '',
         nivel: usuarioActual.nivel || ''
       })
+      setCargando(false)
     }
   }, [usuarioActual])
 
@@ -43,10 +46,7 @@ const MiPerfil = () => {
       return
     }
 
-    // Actualizar en localStorage
     servicio.actualizarUsuario(usuarioActual.id, formulario)
-    
-    // Actualizar en el contexto
     actualizarUsuarioActual(formulario)
 
     mostrarAlerta('success', 'Perfil actualizado correctamente')
@@ -58,6 +58,10 @@ const MiPerfil = () => {
     setTimeout(() => {
       setAlerta({ mostrar: false, tipo: '', mensaje: '' })
     }, 3000)
+  }
+
+  if (cargando) {
+    return <Cargando texto="Cargando perfil..." />
   }
 
   return (

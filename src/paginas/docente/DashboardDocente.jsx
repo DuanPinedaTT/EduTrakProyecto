@@ -3,6 +3,8 @@ import { Card, Row, Col, Badge, Table, Alert } from 'react-bootstrap'
 import { FaBook, FaUsers, FaExclamationTriangle, FaChartLine } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
+import AlertaBajoRendimiento from '../../componentes/comunes/AlertaBajoRendimiento'
 
 const DashboardDocente = () => {
   const { usuarioActual } = useAutenticacion()
@@ -12,69 +14,89 @@ const DashboardDocente = () => {
     estudiantesBajoRendimiento: [],
     promedioGeneral: 0
   })
+  const [cargando, setCargando] = useState(true)
+  const [alertasVisibles, setAlertasVisibles] = useState({})
 
   useEffect(() => {
     cargarEstadisticas()
   }, [])
 
   const cargarEstadisticas = () => {
-    // Obtener materias del docente
-    const materias = servicio.obtenerMateriasPorDocente(usuarioActual.id)
+    setCargando(true)
     
-    // Obtener todos los estudiantes
-    const todosEstudiantes = servicio.obtenerUsuariosPorRol('estudiante')
-    
-    // Calcular estudiantes únicos en las materias del docente
-    const estudiantesConCalificaciones = new Set()
-    let sumaPromedios = 0
-    let contadorPromedios = 0
+    setTimeout(() => {
+      const materias = servicio.obtenerMateriasPorDocente(usuarioActual.id)
+      const todosEstudiantes = servicio.obtenerUsuariosPorRol('estudiante')
+      
+      const estudiantesConCalificaciones = new Set()
+      let sumaPromedios = 0
+      let contadorPromedios = 0
 
-    materias.forEach(materia => {
-      const calificaciones = servicio.obtenerCalificacionesPorMateria(materia.id)
-      calificaciones.forEach(cal => {
-        estudiantesConCalificaciones.add(cal.estudianteId)
-      })
-    })
-
-    // Identificar estudiantes con bajo rendimiento
-    const estudiantesBajo = []
-    materias.forEach(materia => {
-      const calificaciones = servicio.obtenerCalificacionesPorMateria(materia.id)
-      const estudiantesPorMateria = {}
-
-      calificaciones.forEach(cal => {
-        if (!estudiantesPorMateria[cal.estudianteId]) {
-          estudiantesPorMateria[cal.estudianteId] = []
-        }
-        estudiantesPorMateria[cal.estudianteId].push(parseFloat(cal.nota))
+      materias.forEach(materia => {
+        const calificaciones = servicio.obtenerCalificacionesPorMateria(materia.id)
+        calificaciones.forEach(cal => {
+          estudiantesConCalificaciones.add(cal.estudianteId)
+        })
       })
 
-      Object.keys(estudiantesPorMateria).forEach(estudianteId => {
-        const notas = estudiantesPorMateria[estudianteId]
-        const promedio = notas.reduce((sum, nota) => sum + nota, 0) / notas.length
-        
-        if (promedio < 3.0) {
-          const estudiante = todosEstudiantes.find(e => e.id === estudianteId)
-          if (estudiante && !estudiantesBajo.find(e => e.id === estudianteId)) {
-            estudiantesBajo.push({
-              ...estudiante,
-              materia: materia.nombre,
-              promedio: promedio.toFixed(2)
-            })
+      const estudiantesBajo = []
+      materias.forEach(materia => {
+        const calificaciones = servicio.obtenerCalificacionesPorMateria(materia.id)
+        const estudiantesPorMateria = {}
+
+        calificaciones.forEach(cal => {
+          if (!estudiantesPorMateria[cal.estudianteId]) {
+            estudiantesPorMateria[cal.estudianteId] = []
           }
-        }
+          estudiantesPorMateria[cal.estudianteId].push(parseFloat(cal.nota))
+        })
 
-        sumaPromedios += promedio
-        contadorPromedios++
+        Object.keys(estudiantesPorMateria).forEach(estudianteId => {
+          const notas = estudiantesPorMateria[estudianteId]
+          const promedio = notas.reduce((sum, nota) => sum + nota, 0) / notas.length
+          
+          if (promedio < 3.0) {
+            const estudiante = todosEstudiantes.find(e => e.id === estudianteId)
+            if (estudiante && !estudiantesBajo.find(e => e.id === estudianteId)) {
+              estudiantesBajo.push({
+                ...estudiante,
+                materia: materia.nombre,
+                promedio: promedio.toFixed(2)
+              })
+            }
+          }
+
+          sumaPromedios += promedio
+          contadorPromedios++
+        })
       })
-    })
 
-    setEstadisticas({
-      materiasAsignadas: materias,
-      totalEstudiantes: estudiantesConCalificaciones.size,
-      estudiantesBajoRendimiento: estudiantesBajo,
-      promedioGeneral: contadorPromedios > 0 ? (sumaPromedios / contadorPromedios).toFixed(2) : 0
-    })
+      setEstadisticas({
+        materiasAsignadas: materias,
+        totalEstudiantes: estudiantesConCalificaciones.size,
+        estudiantesBajoRendimiento: estudiantesBajo,
+        promedioGeneral: contadorPromedios > 0 ? (sumaPromedios / contadorPromedios).toFixed(2) : 0
+      })
+
+      const alertasIniciales = {}
+      estudiantesBajo.forEach(est => {
+        alertasIniciales[est.id] = true
+      })
+      setAlertasVisibles(alertasIniciales)
+
+      setCargando(false)
+    }, 800)
+  }
+
+  const cerrarAlerta = (estudianteId) => {
+    setAlertasVisibles(prev => ({
+      ...prev,
+      [estudianteId]: false
+    }))
+  }
+
+  if (cargando) {
+    return <Cargando texto="Cargando información..." tamaño="grande" />
   }
 
   return (
@@ -85,7 +107,6 @@ const DashboardDocente = () => {
         <p className="mb-0 mt-2">Aquí encontrarás un resumen de tus actividades académicas</p>
       </Alert>
 
-      {/* Tarjetas de estadísticas */}
       <Row className="mb-4">
         <Col md={4} className="mb-3">
           <Card className="h-100 shadow-sm border-primary">
@@ -130,7 +151,6 @@ const DashboardDocente = () => {
         </Col>
       </Row>
 
-      {/* Materias asignadas */}
       <Card className="mb-4 shadow-sm">
         <Card.Header className="bg-primary text-white">
           <h5 className="mb-0">Mis Materias</h5>
@@ -163,42 +183,24 @@ const DashboardDocente = () => {
         </Card.Body>
       </Card>
 
-      {/* Alertas de bajo rendimiento */}
       {estadisticas.estudiantesBajoRendimiento.length > 0 && (
-        <Card className="shadow-sm border-warning">
-          <Card.Header className="bg-warning text-dark">
-            <h5 className="mb-0">
-              <FaExclamationTriangle className="me-2" />
-              Estudiantes que Requieren Atención
-            </h5>
-          </Card.Header>
-          <Card.Body>
-            <Table striped hover responsive>
-              <thead>
-                <tr>
-                  <th>Estudiante</th>
-                  <th>Materia</th>
-                  <th>Promedio</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {estadisticas.estudiantesBajoRendimiento.map(estudiante => (
-                  <tr key={`${estudiante.id}-${estudiante.materia}`}>
-                    <td><strong>{estudiante.nombre}</strong></td>
-                    <td>{estudiante.materia}</td>
-                    <td>
-                      <Badge bg="danger">{estudiante.promedio}</Badge>
-                    </td>
-                    <td>
-                      <Badge bg="warning">Requiere Refuerzo</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card.Body>
-        </Card>
+        <div>
+          <h4 className="mb-3">
+            <FaExclamationTriangle className="text-warning me-2" />
+            Estudiantes que Requieren Atención
+          </h4>
+          {estadisticas.estudiantesBajoRendimiento.map(estudiante => (
+            alertasVisibles[estudiante.id] && (
+              <AlertaBajoRendimiento
+                key={estudiante.id}
+                estudiante={estudiante.nombre}
+                promedio={estudiante.promedio}
+                materia={estudiante.materia}
+                onClose={() => cerrarAlerta(estudiante.id)}
+              />
+            )
+          ))}
+        </div>
       )}
     </div>
   )

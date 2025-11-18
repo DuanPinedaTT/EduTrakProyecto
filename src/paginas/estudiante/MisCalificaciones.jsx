@@ -3,6 +3,7 @@ import { Card, Table, Badge, Form, Row, Col, Alert } from 'react-bootstrap'
 import { Bar } from 'react-chartjs-2'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const MisCalificaciones = () => {
   const { usuarioActual } = useAutenticacion()
@@ -12,6 +13,7 @@ const MisCalificaciones = () => {
   const [calificaciones, setCalificaciones] = useState([])
   const [datosGrafica, setDatosGrafica] = useState(null)
   const [promedioGeneral, setPromedioGeneral] = useState(0)
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     cargarDatos()
@@ -22,19 +24,22 @@ const MisCalificaciones = () => {
   }, [periodoSeleccionado])
 
   const cargarDatos = () => {
-    const materiasDB = servicio.obtenerMaterias()
-    const periodosDB = servicio.obtenerPeriodos()
-    
-    setMaterias(materiasDB)
-    setPeriodos(periodosDB)
+    setCargando(true)
+    setTimeout(() => {
+      const materiasDB = servicio.obtenerMaterias()
+      const periodosDB = servicio.obtenerPeriodos()
+      
+      setMaterias(materiasDB)
+      setPeriodos(periodosDB)
 
-    // Seleccionar periodo activo por defecto
-    const periodoActivo = periodosDB.find(p => p.activo)
-    if (periodoActivo) {
-      setPeriodoSeleccionado(periodoActivo.id)
-    } else if (periodosDB.length > 0) {
-      setPeriodoSeleccionado(periodosDB[0].id)
-    }
+      const periodoActivo = periodosDB.find(p => p.activo)
+      if (periodoActivo) {
+        setPeriodoSeleccionado(periodoActivo.id)
+      } else if (periodosDB.length > 0) {
+        setPeriodoSeleccionado(periodosDB[0].id)
+      }
+      setCargando(false)
+    }, 500)
   }
 
   const cargarCalificaciones = () => {
@@ -46,7 +51,6 @@ const MisCalificaciones = () => {
 
     setCalificaciones(califs)
 
-    // Calcular promedio general
     if (califs.length > 0) {
       const suma = califs.reduce((acc, c) => acc + parseFloat(c.nota), 0)
       setPromedioGeneral((suma / califs.length).toFixed(2))
@@ -54,7 +58,6 @@ const MisCalificaciones = () => {
       setPromedioGeneral(0)
     }
 
-    // Agrupar por materia para la gráfica
     const promedioPorMateria = {}
     califs.forEach(cal => {
       if (!promedioPorMateria[cal.materiaId]) {
@@ -104,7 +107,6 @@ const MisCalificaciones = () => {
     return (suma / califsMateria.length).toFixed(2)
   }
 
-  // Agrupar calificaciones por materia
   const materiasConCalificaciones = materias.map(materia => {
     const califsMateria = calificaciones.filter(c => c.materiaId === materia.id)
     if (califsMateria.length === 0) return null
@@ -116,11 +118,14 @@ const MisCalificaciones = () => {
     }
   }).filter(m => m !== null)
 
+  if (cargando) {
+    return <Cargando texto="Cargando calificaciones..." />
+  }
+
   return (
     <div>
       <h2 className="mb-4">Mis Calificaciones</h2>
 
-      {/* Resumen */}
       <Row className="mb-4">
         <Col md={6}>
           <Card className="shadow-sm border-primary">
@@ -154,7 +159,6 @@ const MisCalificaciones = () => {
         </Col>
       </Row>
 
-      {/* Gráfica */}
       {datosGrafica && (
         <Card className="mb-4 shadow-sm">
           <Card.Header className="bg-primary text-white">
@@ -178,7 +182,6 @@ const MisCalificaciones = () => {
         </Card>
       )}
 
-      {/* Calificaciones por materia */}
       {materiasConCalificaciones.length > 0 ? (
         materiasConCalificaciones.map(item => (
           <Card key={item.materia.id} className="mb-3 shadow-sm">

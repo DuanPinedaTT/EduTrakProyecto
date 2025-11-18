@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Card, Button, Table, Modal, Form, Badge, Alert, Row, Col } from 'react-bootstrap'
+import { Card, Button, Table, Modal, Form, Badge, Alert } from 'react-bootstrap'
 import { FaPlus, FaEdit, FaTrash, FaBell } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import ModalConfirmacion from '../../componentes/comunes/ModalConfirmacion'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const GestionNotificaciones = () => {
   const { usuarioActual } = useAutenticacion()
@@ -13,6 +15,9 @@ const GestionNotificaciones = () => {
   const [notificacionActual, setNotificacionActual] = useState(null)
   const [validated, setValidated] = useState(false)
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
+  const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false)
+  const [notificacionAEliminar, setNotificacionAEliminar] = useState(null)
+  const [cargando, setCargando] = useState(true)
 
   const [formulario, setFormulario] = useState({
     materiaId: '',
@@ -26,13 +31,16 @@ const GestionNotificaciones = () => {
   }, [])
 
   const cargarDatos = () => {
-    const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
-    setMaterias(materiasDocente)
-    
-    // Obtener notificaciones del docente
-    const todasNotificaciones = servicio.obtenerNotificaciones()
-    const notificacionesDocente = todasNotificaciones.filter(n => n.docenteId === usuarioActual.id)
-    setNotificaciones(notificacionesDocente)
+    setCargando(true)
+    setTimeout(() => {
+      const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
+      setMaterias(materiasDocente)
+      
+      const todasNotificaciones = servicio.obtenerNotificaciones()
+      const notificacionesDocente = todasNotificaciones.filter(n => n.docenteId === usuarioActual.id)
+      setNotificaciones(notificacionesDocente)
+      setCargando(false)
+    }, 500)
   }
 
   const abrirModalCrear = () => {
@@ -99,11 +107,18 @@ const GestionNotificaciones = () => {
     cerrarModal()
   }
 
-  const eliminarNotificacion = (id) => {
-    if (window.confirm('¿Está seguro de eliminar esta notificación?')) {
-      servicio.eliminarNotificacion(id)
+  const confirmarEliminar = (notificacion) => {
+    setNotificacionAEliminar(notificacion)
+    setMostrarModalConfirmacion(true)
+  }
+
+  const eliminarNotificacion = () => {
+    if (notificacionAEliminar) {
+      servicio.eliminarNotificacion(notificacionAEliminar.id)
       mostrarAlerta('success', 'Notificación eliminada')
       cargarDatos()
+      setMostrarModalConfirmacion(false)
+      setNotificacionAEliminar(null)
     }
   }
 
@@ -127,6 +142,10 @@ const GestionNotificaciones = () => {
       case 'evento': return 'info'
       default: return 'secondary'
     }
+  }
+
+  if (cargando) {
+    return <Cargando texto="Cargando notificaciones..." />
   }
 
   return (
@@ -199,7 +218,7 @@ const GestionNotificaciones = () => {
                       <Button
                         variant="danger"
                         size="sm"
-                        onClick={() => eliminarNotificacion(notif.id)}
+                        onClick={() => confirmarEliminar(notif)}
                       >
                         <FaTrash />
                       </Button>
@@ -214,7 +233,6 @@ const GestionNotificaciones = () => {
         </Card.Body>
       </Card>
 
-      {/* Modal de formulario */}
       <Modal show={mostrarModal} onHide={cerrarModal} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
@@ -296,6 +314,16 @@ const GestionNotificaciones = () => {
           </Modal.Footer>
         </Form>
       </Modal>
+
+      <ModalConfirmacion
+        mostrar={mostrarModalConfirmacion}
+        onCerrar={() => setMostrarModalConfirmacion(false)}
+        onConfirmar={eliminarNotificacion}
+        titulo="Confirmar Eliminación"
+        mensaje="¿Está seguro que desea eliminar esta notificación?"
+        textoBotonConfirmar="Eliminar"
+        variante="danger"
+      />
     </div>
   )
 }

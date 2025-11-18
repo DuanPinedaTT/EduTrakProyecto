@@ -3,6 +3,7 @@ import { Card, Badge, ListGroup, Form, Alert, Button } from 'react-bootstrap'
 import { FaBell, FaCheckCircle, FaFilter } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const MisNotificaciones = () => {
   const { usuarioActual } = useAutenticacion()
@@ -10,20 +11,24 @@ const MisNotificaciones = () => {
   const [materias, setMaterias] = useState([])
   const [filtroTipo, setFiltroTipo] = useState('todas')
   const [filtroMateria, setFiltroMateria] = useState('todas')
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     cargarDatos()
   }, [])
 
   const cargarDatos = () => {
-    const todasNotificaciones = servicio.obtenerNotificaciones()
-    const materiasDB = servicio.obtenerMaterias()
-    
-    // Ordenar por fecha descendente
-    todasNotificaciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-    
-    setNotificaciones(todasNotificaciones)
-    setMaterias(materiasDB)
+    setCargando(true)
+    setTimeout(() => {
+      const todasNotificaciones = servicio.obtenerNotificaciones()
+      const materiasDB = servicio.obtenerMaterias()
+      
+      todasNotificaciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+      
+      setNotificaciones(todasNotificaciones)
+      setMaterias(materiasDB)
+      setCargando(false)
+    }, 500)
   }
 
   const marcarComoLeida = (id) => {
@@ -54,6 +59,10 @@ const MisNotificaciones = () => {
 
   const notificacionesSinLeer = notificaciones.filter(n => !n.leida).length
 
+  if (cargando) {
+    return <Cargando texto="Cargando notificaciones..." />
+  }
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -64,7 +73,6 @@ const MisNotificaciones = () => {
         </Badge>
       </div>
 
-      {/* Filtros */}
       <Card className="mb-4 shadow-sm">
         <Card.Header className="bg-primary text-white">
           <h5 className="mb-0">
@@ -101,7 +109,6 @@ const MisNotificaciones = () => {
         </Card.Body>
       </Card>
 
-      {/* Lista de notificaciones */}
       {notificacionesFiltradas.length > 0 ? (
         <ListGroup>
           {notificacionesFiltradas.map(notif => (

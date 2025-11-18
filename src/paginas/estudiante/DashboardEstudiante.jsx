@@ -4,6 +4,7 @@ import { FaGraduationCap, FaChartLine, FaBell, FaCheckCircle } from 'react-icons
 import { Line } from 'react-chartjs-2'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const DashboardEstudiante = () => {
   const { usuarioActual } = useAutenticacion()
@@ -16,73 +17,76 @@ const DashboardEstudiante = () => {
   const [datosGrafica, setDatosGrafica] = useState(null)
   const [ultimasCalificaciones, setUltimasCalificaciones] = useState([])
   const [materiasConPromedios, setMateriasConPromedios] = useState([])
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     cargarEstadisticas()
   }, [])
 
   const cargarEstadisticas = () => {
-    // Calificaciones
-    const calificaciones = servicio.obtenerCalificacionesPorEstudiante(usuarioActual.id)
-    const promedio = servicio.calcularPromedioEstudiante(usuarioActual.id)
+    setCargando(true)
     
-    // Asistencias
-    const porcentaje = servicio.calcularPorcentajeAsistencia(usuarioActual.id)
-    
-    // Notificaciones sin leer
-    const notificaciones = servicio.obtenerNotificaciones()
-    const sinLeer = notificaciones.filter(n => !n.leida).length
+    setTimeout(() => {
+      const calificaciones = servicio.obtenerCalificacionesPorEstudiante(usuarioActual.id)
+      const promedio = servicio.calcularPromedioEstudiante(usuarioActual.id)
+      const porcentaje = servicio.calcularPorcentajeAsistencia(usuarioActual.id)
+      const notificaciones = servicio.obtenerNotificaciones()
+      const sinLeer = notificaciones.filter(n => !n.leida).length
 
-    // Últimas 5 calificaciones
-    const ultimas = calificaciones
-      .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-      .slice(0, 5)
-    
-    setUltimasCalificaciones(ultimas)
-
-    setEstadisticas({
-      promedioGeneral: promedio,
-      totalCalificaciones: calificaciones.length,
-      porcentajeAsistencia: porcentaje,
-      notificacionesSinLeer: sinLeer
-    })
-
-    // Calcular promedios por materia
-    const materias = servicio.obtenerMaterias()
-    const promediosPorMateria = materias.map(materia => {
-      const califsMateria = calificaciones.filter(c => c.materiaId === materia.id)
-      if (califsMateria.length === 0) return null
+      const ultimas = calificaciones
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+        .slice(0, 5)
       
-      const suma = califsMateria.reduce((acc, c) => acc + parseFloat(c.nota), 0)
-      const prom = (suma / califsMateria.length).toFixed(2)
-      
-      return {
-        materia: materia.nombre,
-        promedio: parseFloat(prom)
-      }
-    }).filter(m => m !== null)
+      setUltimasCalificaciones(ultimas)
 
-    setMateriasConPromedios(promediosPorMateria)
-
-    // Datos para gráfica
-    if (promediosPorMateria.length > 0) {
-      setDatosGrafica({
-        labels: promediosPorMateria.map(m => m.materia),
-        datasets: [{
-          label: 'Mi Promedio por Materia',
-          data: promediosPorMateria.map(m => m.promedio),
-          borderColor: 'rgba(75, 192, 192, 1)',
-          backgroundColor: 'rgba(75, 192, 192, 0.2)',
-          tension: 0.4,
-          fill: true
-        }]
+      setEstadisticas({
+        promedioGeneral: promedio,
+        totalCalificaciones: calificaciones.length,
+        porcentajeAsistencia: porcentaje,
+        notificacionesSinLeer: sinLeer
       })
-    }
+
+      const materias = servicio.obtenerMaterias()
+      const promediosPorMateria = materias.map(materia => {
+        const califsMateria = calificaciones.filter(c => c.materiaId === materia.id)
+        if (califsMateria.length === 0) return null
+        
+        const suma = califsMateria.reduce((acc, c) => acc + parseFloat(c.nota), 0)
+        const prom = (suma / califsMateria.length).toFixed(2)
+        
+        return {
+          materia: materia.nombre,
+          promedio: parseFloat(prom)
+        }
+      }).filter(m => m !== null)
+
+      setMateriasConPromedios(promediosPorMateria)
+
+      if (promediosPorMateria.length > 0) {
+        setDatosGrafica({
+          labels: promediosPorMateria.map(m => m.materia),
+          datasets: [{
+            label: 'Mi Promedio por Materia',
+            data: promediosPorMateria.map(m => m.promedio),
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.4,
+            fill: true
+          }]
+        })
+      }
+
+      setCargando(false)
+    }, 800)
   }
 
   const obtenerNombreMateria = (materiaId) => {
     const materia = servicio.obtenerMateriaPorId(materiaId)
     return materia ? materia.nombre : 'Desconocida'
+  }
+
+  if (cargando) {
+    return <Cargando texto="Cargando información..." tamaño="grande" />
   }
 
   return (
@@ -93,7 +97,6 @@ const DashboardEstudiante = () => {
         <p className="mb-0 mt-2">Aquí encontrarás un resumen de tu desempeño académico</p>
       </Alert>
 
-      {/* Tarjetas de estadísticas */}
       <Row className="mb-4">
         <Col md={3} className="mb-3">
           <Card className="h-100 shadow-sm border-success">
@@ -152,7 +155,6 @@ const DashboardEstudiante = () => {
         </Col>
       </Row>
 
-      {/* Gráfica de rendimiento */}
       {datosGrafica && (
         <Card className="mb-4 shadow-sm">
           <Card.Header className="bg-primary text-white">
@@ -177,7 +179,6 @@ const DashboardEstudiante = () => {
       )}
 
       <Row>
-        {/* Últimas calificaciones */}
         <Col lg={6} className="mb-3">
           <Card className="shadow-sm h-100">
             <Card.Header className="bg-success text-white">
@@ -216,7 +217,6 @@ const DashboardEstudiante = () => {
           </Card>
         </Col>
 
-        {/* Promedios por materia */}
         <Col lg={6} className="mb-3">
           <Card className="shadow-sm h-100">
             <Card.Header className="bg-info text-white">

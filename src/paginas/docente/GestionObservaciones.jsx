@@ -3,6 +3,8 @@ import { Card, Button, Table, Modal, Form, Badge, Alert, Row, Col } from 'react-
 import { FaPlus, FaEdit, FaTrash, FaThumbsUp, FaThumbsDown } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import ModalConfirmacion from '../../componentes/comunes/ModalConfirmacion'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const GestionObservaciones = () => {
   const { usuarioActual } = useAutenticacion()
@@ -14,8 +16,11 @@ const GestionObservaciones = () => {
   const [observacionActual, setObservacionActual] = useState(null)
   const [validated, setValidated] = useState(false)
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
+  const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false)
+  const [observacionAEliminar, setObservacionAEliminar] = useState(null)
   const [filtroMateria, setFiltroMateria] = useState('todas')
   const [filtroTipo, setFiltroTipo] = useState('todas')
+  const [cargando, setCargando] = useState(true)
 
   const [formulario, setFormulario] = useState({
     estudianteId: '',
@@ -29,14 +34,18 @@ const GestionObservaciones = () => {
   }, [])
 
   const cargarDatos = () => {
-    const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
-    const estudiantesDB = servicio.obtenerUsuariosPorRol('estudiante')
-    setMaterias(materiasDocente)
-    setEstudiantes(estudiantesDB)
-    
-    const todasObservaciones = servicio.obtenerObservaciones()
-    const observacionesDocente = todasObservaciones.filter(o => o.docenteId === usuarioActual.id)
-    setObservaciones(observacionesDocente)
+    setCargando(true)
+    setTimeout(() => {
+      const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
+      const estudiantesDB = servicio.obtenerUsuariosPorRol('estudiante')
+      setMaterias(materiasDocente)
+      setEstudiantes(estudiantesDB)
+      
+      const todasObservaciones = servicio.obtenerObservaciones()
+      const observacionesDocente = todasObservaciones.filter(o => o.docenteId === usuarioActual.id)
+      setObservaciones(observacionesDocente)
+      setCargando(false)
+    }, 500)
   }
 
   const abrirModalCrear = () => {
@@ -103,11 +112,18 @@ const GestionObservaciones = () => {
     cerrarModal()
   }
 
-  const eliminarObservacion = (id) => {
-    if (window.confirm('¿Está seguro de eliminar esta observación?')) {
-      servicio.eliminarObservacion(id)
+  const confirmarEliminar = (obs) => {
+    setObservacionAEliminar(obs)
+    setMostrarModalConfirmacion(true)
+  }
+
+  const eliminarObservacion = () => {
+    if (observacionAEliminar) {
+      servicio.eliminarObservacion(observacionAEliminar.id)
       mostrarAlerta('success', 'Observación eliminada')
       cargarDatos()
+      setMostrarModalConfirmacion(false)
+      setObservacionAEliminar(null)
     }
   }
 
@@ -134,6 +150,10 @@ const GestionObservaciones = () => {
     return true
   })
 
+  if (cargando) {
+    return <Cargando texto="Cargando observaciones..." />
+  }
+
   return (
     <div>
       <h2 className="mb-4">Gestión de Observaciones</h2>
@@ -154,7 +174,6 @@ const GestionObservaciones = () => {
         </Button>
       </div>
 
-      {/* Filtros */}
       <Card className="mb-3 shadow-sm">
         <Card.Body>
           <Row>
@@ -236,7 +255,7 @@ const GestionObservaciones = () => {
                       <Button
                         variant="danger"
                         size="sm"
-                        onClick={() => eliminarObservacion(obs.id)}
+                        onClick={() => confirmarEliminar(obs)}
                       >
                         <FaTrash />
                       </Button>
@@ -251,7 +270,6 @@ const GestionObservaciones = () => {
         </Card.Body>
       </Card>
 
-      {/* Modal de formulario */}
       <Modal show={mostrarModal} onHide={cerrarModal} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>
@@ -334,6 +352,16 @@ const GestionObservaciones = () => {
           </Modal.Footer>
         </Form>
       </Modal>
+
+      <ModalConfirmacion
+        mostrar={mostrarModalConfirmacion}
+        onCerrar={() => setMostrarModalConfirmacion(false)}
+        onConfirmar={eliminarObservacion}
+        titulo="Confirmar Eliminación"
+        mensaje="¿Está seguro que desea eliminar esta observación?"
+        textoBotonConfirmar="Eliminar"
+        variante="danger"
+      />
     </div>
   )
 }
