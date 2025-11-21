@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Card, Button, Table, Modal, Form, Badge, Alert, Row, Col } from 'react-bootstrap'
-import { FaPlus, FaEdit, FaCheck, FaTimes, FaClock } from 'react-icons/fa'
+import { Card, Button, Table, Form, Badge, Alert, Row, Col } from 'react-bootstrap'
+import { FaPlus, FaCheck, FaTimes, FaClock } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const GestionAsistencias = () => {
   const { usuarioActual } = useAutenticacion()
@@ -11,8 +12,8 @@ const GestionAsistencias = () => {
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
   const [estudiantes, setEstudiantes] = useState([])
   const [asistencias, setAsistencias] = useState([])
-  const [mostrarModalRapido, setMostrarModalRapido] = useState(false)
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     cargarDatos()
@@ -25,15 +26,19 @@ const GestionAsistencias = () => {
   }, [materiaSeleccionada, fecha])
 
   const cargarDatos = () => {
-    const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
-    const estudiantesDB = servicio.obtenerUsuariosPorRol('estudiante')
-    
-    setMaterias(materiasDocente)
-    setEstudiantes(estudiantesDB)
+    setCargando(true)
+    setTimeout(() => {
+      const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
+      const estudiantesDB = servicio.obtenerUsuariosPorRol('estudiante')
+      
+      setMaterias(materiasDocente)
+      setEstudiantes(estudiantesDB)
 
-    if (materiasDocente.length > 0) {
-      setMateriaSeleccionada(materiasDocente[0].id)
-    }
+      if (materiasDocente.length > 0) {
+        setMateriaSeleccionada(materiasDocente[0].id)
+      }
+      setCargando(false)
+    }, 500)
   }
 
   const cargarAsistencias = () => {
@@ -42,12 +47,7 @@ const GestionAsistencias = () => {
     setAsistencias(asists)
   }
 
-  const abrirRegistroRapido = () => {
-    setMostrarModalRapido(true)
-  }
-
   const registrarAsistenciaRapida = (estudianteId, estado) => {
-    // Verificar si ya existe asistencia para ese estudiante en esa fecha
     const asistenciaExistente = asistencias.find(a => 
       a.estudianteId === estudianteId && 
       a.fecha === fecha && 
@@ -67,27 +67,14 @@ const GestionAsistencias = () => {
     }
 
     cargarAsistencias()
-  }
-
-  const cambiarEstadoAsistencia = (asistenciaId, nuevoEstado) => {
-    servicio.actualizarAsistencia(asistenciaId, { estado: nuevoEstado })
-    mostrarAlerta('success', 'Asistencia actualizada')
-    cargarAsistencias()
-  }
-
-  const eliminarAsistencia = (id) => {
-    if (window.confirm('¿Está seguro de eliminar este registro de asistencia?')) {
-      servicio.eliminarAsistencia(id)
-      mostrarAlerta('success', 'Asistencia eliminada')
-      cargarAsistencias()
-    }
+    mostrarAlerta('success', 'Asistencia registrada')
   }
 
   const mostrarAlerta = (tipo, mensaje) => {
     setAlerta({ mostrar: true, tipo, mensaje })
     setTimeout(() => {
       setAlerta({ mostrar: false, tipo: '', mensaje: '' })
-    }, 3000)
+    }, 2000)
   }
 
   const obtenerAsistenciaEstudiante = (estudianteId) => {
@@ -115,6 +102,10 @@ const GestionAsistencias = () => {
     }
   }
 
+  if (cargando) {
+    return <Cargando texto="Cargando asistencias..." />
+  }
+
   return (
     <div>
       <h2 className="mb-4">Gestión de Asistencias</h2>
@@ -125,7 +116,6 @@ const GestionAsistencias = () => {
         </Alert>
       )}
 
-      {/* Estadísticas */}
       <Row className="mb-3">
         <Col md={3} className="mb-2">
           <Card className="shadow-sm border-primary">
@@ -161,11 +151,10 @@ const GestionAsistencias = () => {
         </Col>
       </Row>
 
-      {/* Filtros */}
       <Card className="mb-3 shadow-sm">
         <Card.Body>
           <Row>
-            <Col md={5} className="mb-2">
+            <Col md={6} className="mb-2">
               <Form.Group>
                 <Form.Label>Materia</Form.Label>
                 <Form.Select value={materiaSeleccionada} onChange={(e) => setMateriaSeleccionada(e.target.value)}>
@@ -175,7 +164,7 @@ const GestionAsistencias = () => {
                 </Form.Select>
               </Form.Group>
             </Col>
-            <Col md={5} className="mb-2">
+            <Col md={6} className="mb-2">
               <Form.Group>
                 <Form.Label>Fecha</Form.Label>
                 <Form.Control
@@ -185,17 +174,10 @@ const GestionAsistencias = () => {
                 />
               </Form.Group>
             </Col>
-            <Col md={2} className="mb-2 d-flex align-items-end">
-              <Button variant="primary" onClick={abrirRegistroRapido} className="w-100">
-                <FaPlus className="me-2" />
-                Registro
-              </Button>
-            </Col>
           </Row>
         </Card.Body>
       </Card>
 
-      {/* Tabla de asistencias */}
       <Card className="shadow-sm">
         <Card.Header className="bg-primary text-white">
           <h5 className="mb-0">Lista de Asistencia - {fecha}</h5>

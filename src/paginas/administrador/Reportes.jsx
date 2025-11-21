@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Card, Button, Table, Form, Row, Col, Badge } from 'react-bootstrap'
 import { FaDownload, FaFilePdf, FaFileExcel, FaChartBar } from 'react-icons/fa'
-import { Bar, Line } from 'react-chartjs-2'
+import { Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,6 +14,7 @@ import {
   Legend
 } from 'chart.js'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend)
 
@@ -25,6 +26,7 @@ const Reportes = () => {
   const [tipoReporte, setTipoReporte] = useState('general')
   const [datosReporte, setDatosReporte] = useState(null)
   const [estudiantesReporte, setEstudiantesReporte] = useState([])
+  const [cargando, setCargando] = useState(false)
 
   useEffect(() => {
     cargarDatos()
@@ -42,7 +44,6 @@ const Reportes = () => {
     setPeriodos(periodosDB)
     setMaterias(materiasDB)
     
-    // Seleccionar periodo activo por defecto
     const periodoActivo = periodosDB.find(p => p.activo)
     if (periodoActivo) {
       setPeriodoSeleccionado(periodoActivo.id)
@@ -50,15 +51,21 @@ const Reportes = () => {
   }
 
   const generarReporte = () => {
-    const estudiantes = servicio.obtenerUsuariosPorRol('estudiante')
+    setCargando(true)
     
-    if (tipoReporte === 'general') {
-      generarReporteGeneral(estudiantes)
-    } else if (tipoReporte === 'materia' && materiaSeleccionada) {
-      generarReportePorMateria(estudiantes)
-    } else if (tipoReporte === 'asistencia') {
-      generarReporteAsistencia(estudiantes)
-    }
+    setTimeout(() => {
+      const estudiantes = servicio.obtenerUsuariosPorRol('estudiante')
+      
+      if (tipoReporte === 'general') {
+        generarReporteGeneral(estudiantes)
+      } else if (tipoReporte === 'materia' && materiaSeleccionada) {
+        generarReportePorMateria(estudiantes)
+      } else if (tipoReporte === 'asistencia') {
+        generarReporteAsistencia(estudiantes)
+      }
+      
+      setCargando(false)
+    }, 800)
   }
 
   const generarReporteGeneral = (estudiantes) => {
@@ -74,7 +81,6 @@ const Reportes = () => {
 
     setEstudiantesReporte(estudiantesConDatos)
 
-    // Generar datos para gráfica
     setDatosReporte({
       labels: estudiantesConDatos.map(e => e.nombre.split(' ')[0]),
       datasets: [
@@ -227,7 +233,6 @@ const Reportes = () => {
     <div>
       <h2 className="mb-4">Reportes y Estadísticas</h2>
 
-      {/* Controles de filtros */}
       <Card className="mb-4 shadow-sm">
         <Card.Header className="bg-primary text-white">
           <h5 className="mb-0">
@@ -286,7 +291,7 @@ const Reportes = () => {
             </Button>
             <Button variant="info" onClick={exportarJSON}>
               <FaDownload className="me-2" />
-              Exportar Datos Completos
+              Exportar Datos
             </Button>
             <Button variant="warning" as="label" htmlFor="importar-archivo">
               <FaDownload className="me-2" />
@@ -303,124 +308,128 @@ const Reportes = () => {
         </Card.Body>
       </Card>
 
-      {/* Gráfica */}
-      {datosReporte && (
-        <Card className="mb-4 shadow-sm">
-          <Card.Header className="bg-success text-white">
-            <h5 className="mb-0">Visualización Gráfica</h5>
-          </Card.Header>
-          <Card.Body>
-            <Bar
-              data={datosReporte}
-              options={{
-                responsive: true,
-                maintainAspectRatio: true,
-                scales: {
-                  y: {
-                    beginAtZero: true,
-                    max: tipoReporte === 'asistencia' ? 100 : 5
-                  }
-                }
-              }}
-            />
-          </Card.Body>
-        </Card>
-      )}
-
-      {/* Tabla de datos */}
-      <Card className="shadow-sm">
-        <Card.Header className="bg-info text-white">
-          <h5 className="mb-0">Datos Detallados</h5>
-        </Card.Header>
-        <Card.Body>
-          {estudiantesReporte.length > 0 ? (
-            <Table striped hover responsive>
-              <thead className="table-dark">
-                <tr>
-                  <th>Nombre</th>
-                  <th>Email</th>
-                  <th>Nivel</th>
-                  {tipoReporte === 'general' && (
-                    <>
-                      <th>Promedio</th>
-                      <th>% Asistencia</th>
-                      <th>Estado</th>
-                    </>
-                  )}
-                  {tipoReporte === 'materia' && (
-                    <>
-                      <th>Promedio</th>
-                      <th>Estado</th>
-                    </>
-                  )}
-                  {tipoReporte === 'asistencia' && (
-                    <>
-                      <th>Total</th>
-                      <th>Presentes</th>
-                      <th>Ausentes</th>
-                      <th>Tardanzas</th>
-                      <th>%</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {estudiantesReporte.map(estudiante => (
-                  <tr key={estudiante.id}>
-                    <td><strong>{estudiante.nombre}</strong></td>
-                    <td>{estudiante.email}</td>
-                    <td>{estudiante.nivel || '-'}</td>
-                    {tipoReporte === 'general' && (
-                      <>
-                        <td>
-                          <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'danger'}>
-                            {estudiante.promedio.toFixed(2)}
-                          </Badge>
-                        </td>
-                        <td>{estudiante.asistencia}%</td>
-                        <td>
-                          <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'warning'}>
-                            {estudiante.promedio >= 3.0 ? 'Aprobado' : 'Bajo Rendimiento'}
-                          </Badge>
-                        </td>
-                      </>
-                    )}
-                    {tipoReporte === 'materia' && (
-                      <>
-                        <td>
-                          <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'danger'}>
-                            {estudiante.promedio.toFixed(2)}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'warning'}>
-                            {estudiante.promedio >= 3.0 ? 'Aprobado' : 'Necesita Refuerzo'}
-                          </Badge>
-                        </td>
-                      </>
-                    )}
-                    {tipoReporte === 'asistencia' && (
-                      <>
-                        <td>{estudiante.totalAsistencias}</td>
-                        <td><Badge bg="success">{estudiante.presentes}</Badge></td>
-                        <td><Badge bg="danger">{estudiante.ausentes}</Badge></td>
-                        <td><Badge bg="warning">{estudiante.tardanzas}</Badge></td>
-                        <td>
-                          <strong className={estudiante.porcentaje >= 80 ? 'text-success' : 'text-danger'}>
-                            {estudiante.porcentaje}%
-                          </strong>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          ) : (
-            <p className="text-center text-muted">No hay datos disponibles para mostrar</p>
+      {cargando ? (
+        <Cargando texto="Generando reporte..." tamaño="grande" />
+      ) : (
+        <>
+          {datosReporte && (
+            <Card className="mb-4 shadow-sm">
+              <Card.Header className="bg-success text-white">
+                <h5 className="mb-0">Visualización Gráfica</h5>
+              </Card.Header>
+              <Card.Body>
+                <Bar
+                  data={datosReporte}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        max: tipoReporte === 'asistencia' ? 100 : 5
+                      }
+                    }
+                  }}
+                />
+              </Card.Body>
+            </Card>
           )}
-        </Card.Body>
-      </Card>
+
+          <Card className="shadow-sm">
+            <Card.Header className="bg-info text-white">
+              <h5 className="mb-0">Datos Detallados</h5>
+            </Card.Header>
+            <Card.Body>
+              {estudiantesReporte.length > 0 ? (
+                <Table striped hover responsive>
+                  <thead className="table-dark">
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Email</th>
+                      <th>Nivel</th>
+                      {tipoReporte === 'general' && (
+                        <>
+                          <th>Promedio</th>
+                          <th>% Asistencia</th>
+                          <th>Estado</th>
+                        </>
+                      )}
+                      {tipoReporte === 'materia' && (
+                        <>
+                          <th>Promedio</th>
+                          <th>Estado</th>
+                        </>
+                      )}
+                      {tipoReporte === 'asistencia' && (
+                        <>
+                          <th>Total</th>
+                          <th>Presentes</th>
+                          <th>Ausentes</th>
+                          <th>Tardanzas</th>
+                          <th>%</th>
+                        </>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {estudiantesReporte.map(estudiante => (
+                      <tr key={estudiante.id}>
+                        <td><strong>{estudiante.nombre}</strong></td>
+                        <td>{estudiante.email}</td>
+                        <td>{estudiante.nivel || '-'}</td>
+                        {tipoReporte === 'general' && (
+                          <>
+                            <td>
+                              <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'danger'}>
+                                {estudiante.promedio.toFixed(2)}
+                              </Badge>
+                            </td>
+                            <td>{estudiante.asistencia}%</td>
+                            <td>
+                              <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'warning'}>
+                                {estudiante.promedio >= 3.0 ? 'Aprobado' : 'Bajo Rendimiento'}
+                              </Badge>
+                            </td>
+                          </>
+                        )}
+                        {tipoReporte === 'materia' && (
+                          <>
+                            <td>
+                              <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'danger'}>
+                                {estudiante.promedio.toFixed(2)}
+                              </Badge>
+                            </td>
+                            <td>
+                              <Badge bg={estudiante.promedio >= 3.0 ? 'success' : 'warning'}>
+                                {estudiante.promedio >= 3.0 ? 'Aprobado' : 'Necesita Refuerzo'}
+                              </Badge>
+                            </td>
+                          </>
+                        )}
+                        {tipoReporte === 'asistencia' && (
+                          <>
+                            <td>{estudiante.totalAsistencias}</td>
+                            <td><Badge bg="success">{estudiante.presentes}</Badge></td>
+                            <td><Badge bg="danger">{estudiante.ausentes}</Badge></td>
+                            <td><Badge bg="warning">{estudiante.tardanzas}</Badge></td>
+                            <td>
+                              <strong className={estudiante.porcentaje >= 80 ? 'text-success' : 'text-danger'}>
+                                {estudiante.porcentaje}%
+                              </strong>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              ) : (
+                <p className="text-center text-muted">No hay datos disponibles para mostrar</p>
+              )}
+            </Card.Body>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

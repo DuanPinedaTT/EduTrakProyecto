@@ -4,6 +4,7 @@ import { Doughnut } from 'react-chartjs-2'
 import { FaCheckCircle, FaTimesCircle, FaClock } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const MisAsistencias = () => {
   const { usuarioActual } = useAutenticacion()
@@ -18,6 +19,7 @@ const MisAsistencias = () => {
     porcentaje: 0
   })
   const [datosGrafica, setDatosGrafica] = useState(null)
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     cargarDatos()
@@ -28,8 +30,12 @@ const MisAsistencias = () => {
   }, [materiaSeleccionada])
 
   const cargarDatos = () => {
-    const materiasDB = servicio.obtenerMaterias()
-    setMaterias(materiasDB)
+    setCargando(true)
+    setTimeout(() => {
+      const materiasDB = servicio.obtenerMaterias()
+      setMaterias(materiasDB)
+      setCargando(false)
+    }, 500)
   }
 
   const cargarAsistencias = () => {
@@ -39,11 +45,9 @@ const MisAsistencias = () => {
       asists = asists.filter(a => a.materiaId === materiaSeleccionada)
     }
 
-    // Ordenar por fecha descendente
     asists.sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
     setAsistencias(asists)
 
-    // Calcular estadísticas
     const total = asists.length
     const presentes = asists.filter(a => a.estado === 'presente').length
     const ausentes = asists.filter(a => a.estado === 'ausente').length
@@ -52,7 +56,6 @@ const MisAsistencias = () => {
 
     setEstadisticas({ total, presentes, ausentes, tardanzas, porcentaje })
 
-    // Datos para gráfica
     setDatosGrafica({
       labels: ['Presente', 'Ausente', 'Tardanza'],
       datasets: [{
@@ -90,11 +93,14 @@ const MisAsistencias = () => {
     }
   }
 
+  if (cargando) {
+    return <Cargando texto="Cargando asistencias..." />
+  }
+
   return (
     <div>
       <h2 className="mb-4">Mis Asistencias</h2>
 
-      {/* Estadísticas */}
       <Row className="mb-4">
         <Col md={3} className="mb-3">
           <Card className="shadow-sm border-primary text-center">
@@ -131,7 +137,6 @@ const MisAsistencias = () => {
       </Row>
 
       <Row className="mb-4">
-        {/* Gráfica */}
         <Col lg={6} className="mb-3">
           <Card className="shadow-sm h-100">
             <Card.Header className="bg-primary text-white">
@@ -147,7 +152,6 @@ const MisAsistencias = () => {
           </Card>
         </Col>
 
-        {/* Filtros */}
         <Col lg={6} className="mb-3">
           <Card className="shadow-sm h-100">
             <Card.Header className="bg-info text-white">
@@ -187,7 +191,6 @@ const MisAsistencias = () => {
         </Col>
       </Row>
 
-      {/* Historial */}
       <Card className="shadow-sm">
         <Card.Header className="bg-success text-white">
           <h5 className="mb-0">Historial de Asistencias</h5>

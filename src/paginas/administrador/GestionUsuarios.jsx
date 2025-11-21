@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Card, Button, Table, Modal, Form, Badge, Alert, InputGroup } from 'react-bootstrap'
-import { FaPlus, FaEdit, FaTrash, FaSearch } from 'react-icons/fa'
+import { FaPlus, FaEdit, FaTrash } from 'react-icons/fa'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Buscador from '../../componentes/comunes/Buscador'
+import ModalConfirmacion from '../../componentes/comunes/ModalConfirmacion'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const GestionUsuarios = () => {
   const [usuarios, setUsuarios] = useState([])
@@ -15,6 +18,7 @@ const GestionUsuarios = () => {
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
   const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false)
   const [usuarioAEliminar, setUsuarioAEliminar] = useState(null)
+  const [cargando, setCargando] = useState(true)
 
   const [formulario, setFormulario] = useState({
     nombre: '',
@@ -35,8 +39,12 @@ const GestionUsuarios = () => {
   }, [usuarios, busqueda, filtroRol])
 
   const cargarUsuarios = () => {
-    const usuariosDB = servicio.obtenerUsuarios()
-    setUsuarios(usuariosDB)
+    setCargando(true)
+    setTimeout(() => {
+      const usuariosDB = servicio.obtenerUsuarios()
+      setUsuarios(usuariosDB)
+      setCargando(false)
+    }, 500)
   }
 
   const filtrarUsuarios = () => {
@@ -112,11 +120,9 @@ const GestionUsuarios = () => {
     }
 
     if (modoEdicion) {
-      // Actualizar usuario
       servicio.actualizarUsuario(usuarioActual.id, formulario)
       mostrarAlerta('success', 'Usuario actualizado correctamente')
     } else {
-      // Crear nuevo usuario
       servicio.crearUsuario(formulario)
       mostrarAlerta('success', 'Usuario creado correctamente')
     }
@@ -156,6 +162,14 @@ const GestionUsuarios = () => {
     }
   }
 
+  const manejarBusqueda = (termino) => {
+    setBusqueda(termino)
+  }
+
+  if (cargando) {
+    return <Cargando texto="Cargando usuarios..." />
+  }
+
   return (
     <div>
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -177,17 +191,11 @@ const GestionUsuarios = () => {
         <Card.Body>
           <div className="row">
             <div className="col-md-6 mb-2">
-              <InputGroup>
-                <InputGroup.Text>
-                  <FaSearch />
-                </InputGroup.Text>
-                <Form.Control
-                  type="text"
-                  placeholder="Buscar por nombre o email..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                />
-              </InputGroup>
+              <Buscador
+                placeholder="Buscar por nombre o email..."
+                onBuscar={manejarBusqueda}
+                valorInicial={busqueda}
+              />
             </div>
             <div className="col-md-6 mb-2">
               <Form.Select value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)}>
@@ -387,23 +395,15 @@ const GestionUsuarios = () => {
       </Modal>
 
       {/* Modal de confirmación de eliminación */}
-      <Modal show={mostrarModalConfirmacion} onHide={() => setMostrarModalConfirmacion(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Confirmar Eliminación</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          ¿Está seguro que desea eliminar al usuario <strong>{usuarioAEliminar?.nombre}</strong>?
-          Esta acción no se puede deshacer.
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setMostrarModalConfirmacion(false)}>
-            Cancelar
-          </Button>
-          <Button variant="danger" onClick={eliminarUsuario}>
-            Eliminar
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ModalConfirmacion
+        mostrar={mostrarModalConfirmacion}
+        onCerrar={() => setMostrarModalConfirmacion(false)}
+        onConfirmar={eliminarUsuario}
+        titulo="Confirmar Eliminación"
+        mensaje={`¿Está seguro que desea eliminar al usuario ${usuarioAEliminar?.nombre}? Esta acción no se puede deshacer.`}
+        textoBotonConfirmar="Eliminar"
+        variante="danger"
+      />
     </div>
   )
 }

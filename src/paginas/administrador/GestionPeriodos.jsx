@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Card, Button, Table, Modal, Form, Badge, Alert } from 'react-bootstrap'
 import { FaPlus, FaEdit, FaTrash, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import ModalConfirmacion from '../../componentes/comunes/ModalConfirmacion'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const GestionPeriodos = () => {
   const [periodos, setPeriodos] = useState([])
@@ -12,6 +14,7 @@ const GestionPeriodos = () => {
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
   const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false)
   const [periodoAEliminar, setPeriodoAEliminar] = useState(null)
+  const [cargando, setCargando] = useState(true)
 
   const [formulario, setFormulario] = useState({
     nombre: '',
@@ -25,8 +28,12 @@ const GestionPeriodos = () => {
   }, [])
 
   const cargarPeriodos = () => {
-    const periodosDB = servicio.obtenerPeriodos()
-    setPeriodos(periodosDB)
+    setCargando(true)
+    setTimeout(() => {
+      const periodosDB = servicio.obtenerPeriodos()
+      setPeriodos(periodosDB)
+      setCargando(false)
+    }, 500)
   }
 
   const abrirModalCrear = () => {
@@ -79,13 +86,11 @@ const GestionPeriodos = () => {
       return
     }
 
-    // Validar que fecha fin sea posterior a fecha inicio
     if (new Date(formulario.fechaFin) <= new Date(formulario.fechaInicio)) {
       mostrarAlerta('danger', 'La fecha de fin debe ser posterior a la fecha de inicio')
       return
     }
 
-    // Si se activa este periodo, desactivar los demás
     if (formulario.activo) {
       const todosPeriodos = servicio.obtenerPeriodos()
       todosPeriodos.forEach(p => {
@@ -124,7 +129,6 @@ const GestionPeriodos = () => {
 
   const alternarEstado = (periodo) => {
     if (!periodo.activo) {
-      // Desactivar todos los periodos
       periodos.forEach(p => {
         if (p.activo) {
           servicio.actualizarPeriodo(p.id, { activo: false })
@@ -141,6 +145,10 @@ const GestionPeriodos = () => {
     setTimeout(() => {
       setAlerta({ mostrar: false, tipo: '', mensaje: '' })
     }, 3000)
+  }
+
+  if (cargando) {
+    return <Cargando texto="Cargando periodos académicos..." />
   }
 
   return (
@@ -232,7 +240,6 @@ const GestionPeriodos = () => {
         </Card.Body>
       </Card>
 
-      {/* Modal de formulario */}
       <Modal show={mostrarModal} onHide={cerrarModal}>
         <Modal.Header closeButton>
           <Modal.Title>
@@ -305,24 +312,15 @@ const GestionPeriodos = () => {
         </Form>
       </Modal>
 
-      {/* Modal de confirmación */}
-      <Modal show={mostrarModalConfirmacion} onHide={() => setMostrarModalConfirmacion(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Confirmar Eliminación</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          ¿Está seguro que desea eliminar el periodo <strong>{periodoAEliminar?.nombre}</strong>?
-          Esta acción no se puede deshacer.
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setMostrarModalConfirmacion(false)}>
-            Cancelar
-          </Button>
-          <Button variant="danger" onClick={eliminarPeriodo}>
-            Eliminar
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <ModalConfirmacion
+        mostrar={mostrarModalConfirmacion}
+        onCerrar={() => setMostrarModalConfirmacion(false)}
+        onConfirmar={eliminarPeriodo}
+        titulo="Confirmar Eliminación"
+        mensaje={`¿Está seguro que desea eliminar el periodo ${periodoAEliminar?.nombre}? Esta acción no se puede deshacer.`}
+        textoBotonConfirmar="Eliminar"
+        variante="danger"
+      />
     </div>
   )
 }

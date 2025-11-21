@@ -13,6 +13,8 @@ import {
   Legend
 } from 'chart.js'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import Cargando from '../../componentes/comunes/Cargando'
+import AlertaBajoRendimiento from '../../componentes/comunes/AlertaBajoRendimiento'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend)
 
@@ -23,76 +25,102 @@ const DashboardAdmin = () => {
     totalMaterias: 0,
     estudiantesBajoRendimiento: []
   })
-
   const [datosGraficas, setDatosGraficas] = useState({
     rendimientoPorMateria: null,
     distribucionRoles: null
   })
+  const [cargando, setCargando] = useState(true)
+  const [alertasVisibles, setAlertasVisibles] = useState({})
 
   useEffect(() => {
     cargarEstadisticas()
   }, [])
 
-  const cargarEstadisticas = () => {
-    const usuarios = servicio.obtenerUsuarios()
-    const materias = servicio.obtenerMaterias()
-    const estudiantes = usuarios.filter(u => u.rol === 'estudiante')
-    const docentes = usuarios.filter(u => u.rol === 'docente')
+  const cargarEstadisticas = async () => {
+    setCargando(true)
+    
+    // Simular carga asíncrona
+    setTimeout(() => {
+      const usuarios = servicio.obtenerUsuarios()
+      const materias = servicio.obtenerMaterias()
+      const estudiantes = usuarios.filter(u => u.rol === 'estudiante')
+      const docentes = usuarios.filter(u => u.rol === 'docente')
 
-    // Calcular estudiantes con bajo rendimiento
-    const estudiantesBajo = estudiantes.filter(est => {
-      const promedio = parseFloat(servicio.calcularPromedioEstudiante(est.id))
-      return promedio > 0 && promedio < 3.0
-    }).map(est => ({
-      ...est,
-      promedio: servicio.calcularPromedioEstudiante(est.id)
+      // Calcular estudiantes con bajo rendimiento
+      const estudiantesBajo = estudiantes.filter(est => {
+        const promedio = parseFloat(servicio.calcularPromedioEstudiante(est.id))
+        return promedio > 0 && promedio < 3.0
+      }).map(est => ({
+        ...est,
+        promedio: servicio.calcularPromedioEstudiante(est.id)
+      }))
+
+      setEstadisticas({
+        totalEstudiantes: estudiantes.length,
+        totalDocentes: docentes.length,
+        totalMaterias: materias.length,
+        estudiantesBajoRendimiento: estudiantesBajo
+      })
+
+      // Inicializar alertas visibles
+      const alertasIniciales = {}
+      estudiantesBajo.forEach(est => {
+        alertasIniciales[est.id] = true
+      })
+      setAlertasVisibles(alertasIniciales)
+
+      // Datos para gráfica de rendimiento por materia
+      const materiaStats = materias.map(materia => {
+        const calificaciones = servicio.obtenerCalificacionesPorMateria(materia.id)
+        if (calificaciones.length === 0) return { materia: materia.nombre, promedio: 0 }
+        const suma = calificaciones.reduce((acc, cal) => acc + parseFloat(cal.nota), 0)
+        return {
+          materia: materia.nombre,
+          promedio: (suma / calificaciones.length).toFixed(2)
+        }
+      })
+
+      setDatosGraficas({
+        rendimientoPorMateria: {
+          labels: materiaStats.map(m => m.materia),
+          datasets: [{
+            label: 'Promedio por Materia',
+            data: materiaStats.map(m => m.promedio),
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        distribucionRoles: {
+          labels: ['Estudiantes', 'Docentes', 'Administradores'],
+          datasets: [{
+            data: [
+              estudiantes.length,
+              docentes.length,
+              usuarios.filter(u => u.rol === 'administrador').length
+            ],
+            backgroundColor: [
+              'rgba(75, 192, 192, 0.6)',
+              'rgba(255, 159, 64, 0.6)',
+              'rgba(153, 102, 255, 0.6)'
+            ]
+          }]
+        }
+      })
+
+      setCargando(false)
+    }, 800)
+  }
+
+  const cerrarAlerta = (estudianteId) => {
+    setAlertasVisibles(prev => ({
+      ...prev,
+      [estudianteId]: false
     }))
+  }
 
-    setEstadisticas({
-      totalEstudiantes: estudiantes.length,
-      totalDocentes: docentes.length,
-      totalMaterias: materias.length,
-      estudiantesBajoRendimiento: estudiantesBajo
-    })
-
-    // Datos para gráfica de rendimiento por materia
-    const materiaStats = materias.map(materia => {
-      const calificaciones = servicio.obtenerCalificacionesPorMateria(materia.id)
-      if (calificaciones.length === 0) return { materia: materia.nombre, promedio: 0 }
-      const suma = calificaciones.reduce((acc, cal) => acc + parseFloat(cal.nota), 0)
-      return {
-        materia: materia.nombre,
-        promedio: (suma / calificaciones.length).toFixed(2)
-      }
-    })
-
-    setDatosGraficas({
-      rendimientoPorMateria: {
-        labels: materiaStats.map(m => m.materia),
-        datasets: [{
-          label: 'Promedio por Materia',
-          data: materiaStats.map(m => m.promedio),
-          backgroundColor: 'rgba(54, 162, 235, 0.5)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1
-        }]
-      },
-      distribucionRoles: {
-        labels: ['Estudiantes', 'Docentes', 'Administradores'],
-        datasets: [{
-          data: [
-            estudiantes.length,
-            docentes.length,
-            usuarios.filter(u => u.rol === 'administrador').length
-          ],
-          backgroundColor: [
-            'rgba(75, 192, 192, 0.6)',
-            'rgba(255, 159, 64, 0.6)',
-            'rgba(153, 102, 255, 0.6)'
-          ]
-        }]
-      }
-    })
+  if (cargando) {
+    return <Cargando texto="Cargando estadísticas..." tamaño="grande" />
   }
 
   return (
@@ -189,42 +217,22 @@ const DashboardAdmin = () => {
 
       {/* Alertas de bajo rendimiento */}
       {estadisticas.estudiantesBajoRendimiento.length > 0 && (
-        <Card className="shadow-sm border-warning">
-          <Card.Header className="bg-warning text-dark">
-            <h5 className="mb-0">
-              <FaExclamationTriangle className="me-2" />
-              Estudiantes con Bajo Rendimiento
-            </h5>
-          </Card.Header>
-          <Card.Body>
-            <Table striped hover responsive>
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Email</th>
-                  <th>Nivel</th>
-                  <th>Promedio</th>
-                  <th>Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {estadisticas.estudiantesBajoRendimiento.map(estudiante => (
-                  <tr key={estudiante.id}>
-                    <td>{estudiante.nombre}</td>
-                    <td>{estudiante.email}</td>
-                    <td>{estudiante.nivel}</td>
-                    <td>
-                      <strong className="text-danger">{estudiante.promedio}</strong>
-                    </td>
-                    <td>
-                      <Badge bg="danger">Requiere Atención</Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          </Card.Body>
-        </Card>
+        <div className="mb-4">
+          <h4 className="mb-3">
+            <FaExclamationTriangle className="text-warning me-2" />
+            Alertas de Estudiantes
+          </h4>
+          {estadisticas.estudiantesBajoRendimiento.map(estudiante => (
+            alertasVisibles[estudiante.id] && (
+              <AlertaBajoRendimiento
+                key={estudiante.id}
+                estudiante={estudiante.nombre}
+                promedio={estudiante.promedio}
+                onClose={() => cerrarAlerta(estudiante.id)}
+              />
+            )
+          ))}
+        </div>
       )}
     </div>
   )

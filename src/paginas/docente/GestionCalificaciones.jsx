@@ -3,6 +3,8 @@ import { Card, Button, Table, Modal, Form, Badge, Alert, Row, Col } from 'react-
 import { FaPlus, FaEdit, FaTrash, FaExclamationTriangle } from 'react-icons/fa'
 import { useAutenticacion } from '../../contextos/ProveedorAutenticacion'
 import * as servicio from '../../servicios/servicioLocalStorage'
+import ModalConfirmacion from '../../componentes/comunes/ModalConfirmacion'
+import Cargando from '../../componentes/comunes/Cargando'
 
 const GestionCalificaciones = () => {
   const { usuarioActual } = useAutenticacion()
@@ -17,6 +19,9 @@ const GestionCalificaciones = () => {
   const [calificacionActual, setCalificacionActual] = useState(null)
   const [validated, setValidated] = useState(false)
   const [alerta, setAlerta] = useState({ mostrar: false, tipo: '', mensaje: '' })
+  const [mostrarModalConfirmacion, setMostrarModalConfirmacion] = useState(false)
+  const [calificacionAEliminar, setCalificacionAEliminar] = useState(null)
+  const [cargando, setCargando] = useState(true)
 
   const [formulario, setFormulario] = useState({
     estudianteId: '',
@@ -37,22 +42,26 @@ const GestionCalificaciones = () => {
   }, [materiaSeleccionada, periodoSeleccionado])
 
   const cargarDatos = () => {
-    const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
-    const periodosDB = servicio.obtenerPeriodos()
-    const estudiantesDB = servicio.obtenerUsuariosPorRol('estudiante')
-    
-    setMaterias(materiasDocente)
-    setPeriodos(periodosDB)
-    setEstudiantes(estudiantesDB)
+    setCargando(true)
+    setTimeout(() => {
+      const materiasDocente = servicio.obtenerMateriasPorDocente(usuarioActual.id)
+      const periodosDB = servicio.obtenerPeriodos()
+      const estudiantesDB = servicio.obtenerUsuariosPorRol('estudiante')
+      
+      setMaterias(materiasDocente)
+      setPeriodos(periodosDB)
+      setEstudiantes(estudiantesDB)
 
-    // Seleccionar primera materia y periodo activo por defecto
-    if (materiasDocente.length > 0) {
-      setMateriaSeleccionada(materiasDocente[0].id)
-    }
-    const periodoActivo = periodosDB.find(p => p.activo)
-    if (periodoActivo) {
-      setPeriodoSeleccionado(periodoActivo.id)
-    }
+      if (materiasDocente.length > 0) {
+        setMateriaSeleccionada(materiasDocente[0].id)
+      }
+      const periodoActivo = periodosDB.find(p => p.activo)
+      if (periodoActivo) {
+        setPeriodoSeleccionado(periodoActivo.id)
+      }
+      
+      setCargando(false)
+    }, 500)
   }
 
   const cargarCalificaciones = () => {
@@ -123,7 +132,6 @@ const GestionCalificaciones = () => {
       servicio.crearCalificacion(formulario)
       mostrarAlerta('success', 'Calificación registrada correctamente')
       
-      // Verificar si es bajo rendimiento
       if (nota < 3.0) {
         mostrarAlerta('warning', 'Alerta: Calificación por debajo del promedio mínimo')
       }
@@ -133,11 +141,18 @@ const GestionCalificaciones = () => {
     cerrarModal()
   }
 
-  const eliminarCalificacion = (id) => {
-    if (window.confirm('¿Está seguro de eliminar esta calificación?')) {
-      servicio.eliminarCalificacion(id)
+  const confirmarEliminar = (calificacion) => {
+    setCalificacionAEliminar(calificacion)
+    setMostrarModalConfirmacion(true)
+  }
+
+  const eliminarCalificacion = () => {
+    if (calificacionAEliminar) {
+      servicio.eliminarCalificacion(calificacionAEliminar.id)
       mostrarAlerta('success', 'Calificación eliminada correctamente')
       cargarCalificaciones()
+      setMostrarModalConfirmacion(false)
+      setCalificacionAEliminar(null)
     }
   }
 
@@ -160,7 +175,6 @@ const GestionCalificaciones = () => {
     return (suma / califs.length).toFixed(2)
   }
 
-  // Agrupar calificaciones por estudiante
   const estudiantesConCalificaciones = estudiantes.map(est => {
     const califsEstudiante = calificaciones.filter(c => c.estudianteId === est.id)
     const promedio = calcularPromedioEstudiante(est.id)
@@ -170,6 +184,10 @@ const GestionCalificaciones = () => {
       promedio
     }
   }).filter(est => est.calificaciones.length > 0)
+
+  if (cargando) {
+    return <Cargando texto="Cargando calificaciones..." />
+  }
 
   return (
     <div>
@@ -181,7 +199,6 @@ const GestionCalificaciones = () => {
         </Alert>
       )}
 
-      {/* Filtros */}
       <Card className="mb-3 shadow-sm">
         <Card.Body>
           <Row>
@@ -215,7 +232,6 @@ const GestionCalificaciones = () => {
         </Card.Body>
       </Card>
 
-      {/* Tabla de calificaciones por estudiante */}
       <Card className="shadow-sm">
         <Card.Header className="bg-primary text-white">
           <h5 className="mb-0">Calificaciones Registradas</h5>
@@ -276,7 +292,7 @@ const GestionCalificaciones = () => {
                           <Button
                             variant="danger"
                             size="sm"
-                            onClick={() => eliminarCalificacion(cal.id)}
+                            onClick={() => confirmarEliminar(cal)}
                           >
                             <FaTrash />
                           </Button>
@@ -293,7 +309,6 @@ const GestionCalificaciones = () => {
         </Card.Body>
       </Card>
 
-      {/* Modal de formulario */}
       <Modal show={mostrarModal} onHide={cerrarModal}>
         <Modal.Header closeButton>
           <Modal.Title>
@@ -371,6 +386,16 @@ const GestionCalificaciones = () => {
           </Modal.Footer>
         </Form>
       </Modal>
+
+      <ModalConfirmacion
+        mostrar={mostrarModalConfirmacion}
+        onCerrar={() => setMostrarModalConfirmacion(false)}
+        onConfirmar={eliminarCalificacion}
+        titulo="Confirmar Eliminación"
+        mensaje="¿Está seguro que desea eliminar esta calificación? Esta acción no se puede deshacer."
+        textoBotonConfirmar="Eliminar"
+        variante="danger"
+      />
     </div>
   )
 }
